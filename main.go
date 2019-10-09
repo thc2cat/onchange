@@ -6,7 +6,6 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
-	"sync"
 	"time"
 
 	"github.com/fsnotify/fsnotify"
@@ -14,7 +13,6 @@ import (
 
 var (
 	watcher   *fsnotify.Watcher
-	xmutex    sync.Mutex
 	cmdname   string
 	arguments []string
 )
@@ -44,16 +42,14 @@ func main() {
 
 	go func() {
 		timestamp := time.Now().Unix()
-		xmutex.Lock()
 		for {
-			xmutex.Unlock()
 			select {
 			// watch for events
 			// case event := <-watcher.Events:
 			// fmt.Printf("EVENT! %#v\n", event)
 			case <-watcher.Events:
 				if time.Now().Unix()-timestamp > 5 {
-					execcmd(cmdname, arguments, &xmutex)
+					execcmd(cmdname, arguments)
 					timestamp = time.Now().Unix()
 				}
 
@@ -61,8 +57,6 @@ func main() {
 			case err := <-watcher.Errors:
 				fmt.Println("ERROR", err)
 			}
-
-			xmutex.Lock()
 		}
 	}()
 
@@ -99,11 +93,12 @@ func watchPeriodically(directory string, interval int) {
 	}
 }
 
-func execcmd(c string, cargs []string, lock *sync.Mutex) {
-	lock.Lock()
-	defer lock.Unlock()
+func execcmd(c string, cargs []string) {
 
-	fmt.Printf("Executing %s %v\n", c, cargs)
+	timeStamp := time.Now()
+	hr, min, sec := timeStamp.Clock()
+
+	fmt.Printf("%0d:%02d:%02d - %s %v\n", hr, min, sec, c, cargs)
 	cmd := exec.Command(c, cargs...)
 	r, _ := cmd.CombinedOutput()
 	if len(r) > 0 {
