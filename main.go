@@ -29,6 +29,7 @@ func main() {
 
 	// creates a new file watcher
 	watcher, _ = fsnotify.NewWatcher()
+
 	defer watcher.Close()
 
 	// starting at the root of the project,
@@ -85,7 +86,7 @@ func watchPeriodically(directory string, interval int) {
 	for ; ; <-ticker.C {
 		<-done
 		if err := filepath.Walk(directory, watchDir); err != nil {
-			fmt.Println(err)
+			fmt.Fprintln(os.Stderr, "filepath.Walk", err)
 		}
 		go func() {
 			done <- struct{}{}
