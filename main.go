@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -12,30 +13,35 @@ import (
 )
 
 var (
-	watcher   *fsnotify.Watcher
-	cmdname   string
-	arguments []string
+	watcher  *fsnotify.Watcher
+	command  string
+	interval = (int64)(2)
 )
 
 func main() {
 
-	// build cmd args
-	if len(os.Args) >= 1 {
-		cmdname = os.Args[1]
-	}
-	for i := 2; i < len(os.Args); i++ {
-		arguments = append(arguments, os.Args[i])
+	var err error
+
+	for i := 1; i < len(os.Args); i++ {
+		command += os.Args[i]
+		command += ""
 	}
 
 	// creates a new file watcher
-	watcher, _ = fsnotify.NewWatcher()
+	watcher, err = fsnotify.NewWatcher()
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	defer watcher.Close()
 
 	// starting at the root of the project,
 	// walk each file/directory searching for
 	// directories
-	pwd, _ := os.Getwd()
+	pwd, err := os.Getwd()
+	if err != nil {
+		log.Fatal(err)
+	}
 	go watchPeriodically(pwd, 10)
 
 	done := make(chan os.Signal, 1)
@@ -49,8 +55,8 @@ func main() {
 			// case event := <-watcher.Events:
 			// fmt.Printf("EVENT! %#v\n", event)
 			case <-watcher.Events:
-				if time.Now().Unix()-timestamp > 5 {
-					execcmd(cmdname, arguments)
+				if time.Now().Unix()-timestamp > interval {
+					execcmd(command)
 					timestamp = time.Now().Unix()
 				}
 
@@ -77,6 +83,7 @@ func watchDir(path string, fi os.FileInfo, err error) error {
 // watchPeriodically adds sub directories periodically to watch, with the help
 // of fsnotify which maintains a directory map rather than slice.
 func watchPeriodically(directory string, interval int) {
+	printedOnce := false
 	done := make(chan struct{})
 	go func() {
 		done <- struct{}{}
@@ -86,7 +93,10 @@ func watchPeriodically(directory string, interval int) {
 	for ; ; <-ticker.C {
 		<-done
 		if err := filepath.Walk(directory, watchDir); err != nil {
-			fmt.Fprintln(os.Stderr, "filepath.Walk", err)
+			if !printedOnce {
+				fmt.Fprintln(os.Stderr, "Error with filepath.Walk on", directory, err)
+				printedOnce = true
+			}
 		}
 		go func() {
 			done <- struct{}{}
@@ -94,16 +104,17 @@ func watchPeriodically(directory string, interval int) {
 	}
 }
 
-func execcmd(c string, cargs []string) {
+func execcmd(c string) {
 
-	timeStamp := time.Now()
-	hr, min, sec := timeStamp.Clock()
+	time.Sleep(time.Duration(interval) * time.Second / 2)
+	hr, min, sec := time.Now().Clock()
 
-	fmt.Printf("%0d:%02d:%02d - %s %v\n", hr, min, sec, c, cargs)
-	cmd := exec.Command(c, cargs...)
-	r, _ := cmd.CombinedOutput()
-	if len(r) > 0 {
-		fmt.Printf("%s\n", r)
+	fmt.Printf("%0d:%02d:%02d - %s\n", hr, min, sec, c)
+	r, err := exec.Command("bash", "-c", c).CombinedOutput() // Why worry ?
+	if err != nil {
+		log.Print(err)
 	}
-	time.Sleep(1 * time.Second)
+	if err == nil && len(r) > 0 {
+		fmt.Fprintf(os.Stderr, "%s\n", r)
+	}
 }
