@@ -12,3 +12,5 @@ Commands are executed with "bash -c" to simplify code.
 (master) $ onchange "make update"
 14:27:36 - make update
 ```
+
+For more complex behavior like stop/rebuild/live reload check <https://github.com/cosmtrek/air>
