@@ -2,7 +2,7 @@
 
 On change, do something.
 
-Monitor pwd and when modifications occurs launch a command.
+Monitor files and when modifications occurs launch a command.
 
 Commands are executed with "bash -c" to simplify code.
 
